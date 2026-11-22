@@ -84,7 +84,7 @@ async function captureOverlayScreen() {
   screenCaptureBusy = true;
   try {
     const display = screen.getAllDisplays().find(item => item.id === overlayDisplayId) || screen.getPrimaryDisplay();
-    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 640, height: 360 }, fetchWindowIcons: false });
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 480, height: 270 }, fetchWindowIcons: false });
     const source = sources.find(item => String(item.display_id) === String(display.id)) || sources[0];
     if (!source || source.thumbnail.isEmpty() || !overlayWindow || overlayWindow.isDestroyed()) return;
     const size = source.thumbnail.getSize();
@@ -108,10 +108,10 @@ function createOverlay(settings = overlaySettings) {
   if (dev) overlayWindow.loadURL('http://127.0.0.1:5173/desktop.html#/overlay'); else overlayWindow.loadFile(path.join(__dirname, '../dist/desktop.html'), { hash: '/overlay' });
   overlayWindow.on('closed', () => { overlayWindow = null; overlayDisplayId = null; if (screenAnalysisTimer) { clearInterval(screenAnalysisTimer); screenAnalysisTimer = null; } if (controlWindow && !controlWindow.isDestroyed()) controlWindow.close(); });
   createOverlayControls();
-  const timer = setInterval(() => { if (!overlayWindow || overlayWindow.isDestroyed()) { clearInterval(timer); return; } overlayWindow.webContents.send('cursor-position', screen.getCursorScreenPoint()); }, 16);
+  const timer = setInterval(() => { if (!overlayWindow || overlayWindow.isDestroyed()) { clearInterval(timer); return; } overlayWindow.webContents.send('cursor-position', { ...screen.getCursorScreenPoint(), bounds: bounds.bounds }); }, 16);
   if (screenAnalysisTimer) clearInterval(screenAnalysisTimer);
-  screenAnalysisTimer = setInterval(captureOverlayScreen, 350);
-  setTimeout(captureOverlayScreen, 250);
+  screenAnalysisTimer = setInterval(captureOverlayScreen, 650);
+  setTimeout(captureOverlayScreen, 400);
 }
 function createOverlayControls() {
   if (controlWindow && !controlWindow.isDestroyed()) return;

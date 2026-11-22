@@ -51,29 +51,42 @@ function Overlay({settings, onClose, customComponent}) {
   const uiScoreRef=useRef(0);
   useEffect(()=>{
     let alive=true;
+    let frameSequence=0;
+    const analysisImage=new Image();
+    const analysisCanvas=document.createElement('canvas');
+    const analysisContext=analysisCanvas.getContext('2d',{willReadFrequently:true});
     window.mouseChanger?.getOverlaySettings?.().then(value=>{if(alive&&value)setLiveSettings(value);}).catch(()=>{});
     const off=window.mouseChanger?.onOverlaySettings?.(value=>{if(value)setLiveSettings(value);});
-    const offCursor=window.mouseChanger?.onCursorPosition?.(point=>{pointerRef.current=point;});
+    const offCursor=window.mouseChanger?.onCursorPosition?.(point=>{
+      pointerRef.current=point;
+      const bounds=point?.bounds;
+      if(!bounds) return;
+      const clientX=point.x-bounds.x;
+      const clientY=point.y-bounds.y;
+      const eventOptions={bubbles:true,cancelable:false,view:window,clientX,clientY,screenX:point.x,screenY:point.y,pointerId:1,pointerType:'mouse',isPrimary:true,buttons:0};
+      window.dispatchEvent(new PointerEvent('pointermove',eventOptions));
+      window.dispatchEvent(new MouseEvent('mousemove',eventOptions));
+    });
     const offFrame=window.mouseChanger?.onScreenFrame?.(frame=>{
       const point=pointerRef.current;
-      if(!point || !frame?.dataUrl || !frame.bounds) return;
-      const image=new Image();
-      image.onload=()=>{
-        if(!alive) return;
-        const px=Math.round((point.x-frame.bounds.x)/frame.bounds.width*image.width);
-        const py=Math.round((point.y-frame.bounds.y)/frame.bounds.height*image.height);
-        const radiusX=Math.max(12,Math.round(image.width*90/frame.bounds.width));
-        const radiusY=Math.max(10,Math.round(image.height*58/frame.bounds.height));
-        const left=Math.max(1,px-radiusX), right=Math.min(image.width-1,px+radiusX);
-        const top=Math.max(1,py-radiusY), bottom=Math.min(image.height-1,py+radiusY);
-        if(right-left<8 || bottom-top<8) return;
-        const canvas=document.createElement('canvas');
-        canvas.width=image.width; canvas.height=image.height;
-        const context=canvas.getContext('2d',{willReadFrequently:true});
-        if(!context) return;
-        context.drawImage(image,0,0,image.width,image.height);
-        const pixels=context.getImageData(left,top,right-left,bottom-top).data;
+      if(!point || !frame?.dataUrl || !frame.bounds || !analysisContext) return;
+      const sequence=++frameSequence;
+      analysisImage.onload=()=>{
+        if(!alive || sequence!==frameSequence) return;
+        const px=Math.round((point.x-frame.bounds.x)/frame.bounds.width*analysisImage.width);
+        const py=Math.round((point.y-frame.bounds.y)/frame.bounds.height*analysisImage.height);
+        const radiusX=Math.max(8,Math.round(analysisImage.width*90/frame.bounds.width));
+        const radiusY=Math.max(7,Math.round(analysisImage.height*58/frame.bounds.height));
+        const left=Math.max(0,px-radiusX), right=Math.min(analysisImage.width,px+radiusX);
+        const top=Math.max(0,py-radiusY), bottom=Math.min(analysisImage.height,py+radiusY);
         const patchWidth=right-left, patchHeight=bottom-top;
+        if(patchWidth<8 || patchHeight<8) return;
+        if(analysisCanvas.width!==patchWidth || analysisCanvas.height!==patchHeight){
+          analysisCanvas.width=patchWidth;
+          analysisCanvas.height=patchHeight;
+        }
+        analysisContext.drawImage(analysisImage,left,top,patchWidth,patchHeight,0,0,patchWidth,patchHeight);
+        const pixels=analysisContext.getImageData(0,0,patchWidth,patchHeight).data;
         const lumaAt=(x,y)=>{const i=(y*patchWidth+x)*4;return pixels[i]*0.2126+pixels[i+1]*0.7152+pixels[i+2]*0.0722;};
         let edgeCount=0,samples=0,sum=0,sumSq=0;
         for(let y=1;y<patchHeight-1;y+=2) for(let x=1;x<patchWidth-1;x+=2){
@@ -85,11 +98,12 @@ function Overlay({settings, onClose, customComponent}) {
         const edgeRatio=samples?edgeCount/samples:0;
         const looksLikeUi=edgeRatio>0.075 && variance>190;
         uiScoreRef.current=looksLikeUi?Math.min(3,uiScoreRef.current+1):Math.max(0,uiScoreRef.current-1);
-        setUiActive(uiScoreRef.current>=2);
+        const active=uiScoreRef.current>=2;
+        setUiActive(previous=>previous===active?previous:active);
       };
-      image.src=frame.dataUrl;
+      analysisImage.src=frame.dataUrl;
     });
-    return ()=>{alive=false;off?.();offCursor?.();offFrame?.();};
+    return ()=>{alive=false;frameSequence++;off?.();offCursor?.();offFrame?.();};
   },[]);
   useEffect(()=>{const key=e=>{if(e.key==='Escape') onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[onClose]);
   const color=liveSettings.color || '#78a8ff';
@@ -97,15 +111,15 @@ function Overlay({settings, onClose, customComponent}) {
   const style={width:'100%',height:'100%',opacity:(Number(liveSettings.opacity)||100)/100};
   const id=liveSettings.cursor || 'glow';
   let effect;
-  if(id==='swarm') effect=<SwarmCursor color={color} accentColor={color} size={Math.max(1.2,size/12)} speed={liveSettings.speed||1} hideCursor={false} style={style}/>;
-  else if(id==='ghost') effect=<GhostCursor color={color} size={Math.max(24,size*2.6)} trailLength={Math.max(1,liveSettings.trail||50)} hideCursor={false} style={style}/>;
+  if(id==='swarm') effect=<SwarmCursor color={color} accentColor={color} size={Math.max(1.2,size/12)} count={360} dpr={1} speed={liveSettings.speed||1} hideCursor={false} intro={false} style={style}/>;
+  else if(id==='ghost') effect=<GhostCursor color={color} size={Math.max(24,size*2.6)} trailLength={Math.max(1,liveSettings.trail||50)} maxDevicePixelRatio={1} targetPixels={300000} intro={false} style={style}/>;
   else if(id==='target') effect=<TargetCursor cursorColor={color} size={Math.max(18,size*1.2)} hideDefaultCursor={false}/>;
-  else if(id==='fluid') effect=<FluidGlass color={color} size={Math.max(100,size*4)} interaction="follow" style={style}/>;
+  else if(id==='fluid') effect=<FluidGlass color={color} size={Math.max(100,size*4)} interaction="follow" maxDevicePixelRatio={1} intro={false} style={style}/>;
   else if(id==='text') effect=<TextCursor text="Aa" color={color} fontSize={Math.max(14,size)} hideCursor={false} style={style}/>;
-  else if(id==='splash') effect=<SplashCursor colors={[color]} rainbow={false} size={Math.max(.35,size/30)} theme="dark" style={style}/>;
-  else if(id==='blob') effect=<BlobCursor color={color} size={Math.max(48,size*4)} hideCursor={false} style={style}/>;
-  else effect=<GlowCursor color={color} trailWidth={Math.max(.5,size/10)} glow={uiActive?2:1.2} quality="high" enabled style={style}/>;
-  return <div className="overlay-root" aria-hidden="true"><div className={`overlay-effect-stage${uiActive?' ui-active':''}`}>{effect}</div></div>;
+  else if(id==='splash') effect=<SplashCursor colors={[color]} rainbow={false} size={Math.max(.35,size/30)} quality="medium" intro={false} theme="dark" style={style}/>;
+  else if(id==='blob') effect=<BlobCursor color={color} size={Math.max(48,size*4)} hideCursor={false} trail={10} style={style}/>;
+  else effect=<GlowCursor color={color} trailWidth={Math.max(.5,size/10)} glow={uiActive?2:1.2} quality="medium" maxDevicePixelRatio={1} style={style}/>;
+  return <div className="overlay-root" aria-hidden="true"><div className={`overlay-effect-stage${uiActive?' ui-active':''}`}>{id==='custom'&&customComponent?React.createElement(customComponent):effect}</div></div>;
 }
 export default function App(){
   const isOverlay = window.location.hash.includes('/overlay') && !window.location.hash.includes('/overlay-controls');

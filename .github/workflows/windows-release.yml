@@ -33,14 +33,14 @@ jobs:
       - name: Publish installer to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.5
+          tag_name: v1.0.6
           target_commitish: ${{ github.sha }}
-          name: IRobloxMouseChanger v1.0.5
+          name: IRobloxMouseChanger v1.0.6
           body: |
             Windows installer for IRobloxMouseChanger.
 
-            Download `IRobloxMouseChanger-Setup-1.0.5.exe` below.
-          files: release/IRobloxMouseChanger-Setup-1.0.5.exe
+            Download `IRobloxMouseChanger-Setup-1.0.6.exe` below.
+          files: release/IRobloxMouseChanger-Setup-1.0.6.exe
           fail_on_unmatched_files: true
           draft: false
           prerelease: false
