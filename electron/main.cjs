@@ -21,23 +21,24 @@ function psQuote(value) { return "'" + String(value).replace(/'/g, "''") + "'"; 
 async function applySystemCursor(style) {
   if (process.platform !== 'win32') throw new Error('Windows에서만 시스템 커서를 변경할 수 있습니다.');
   if (!cursorIds.includes(style)) throw new Error('지원하지 않는 커서 스타일입니다.');
-  const cursorPath = path.join(process.resourcesPath, 'cursors', style + '.cur');
+  const cursorDir = app.isPackaged ? path.join(process.resourcesPath, 'cursors') : path.join(__dirname, '../resources/cursors');
+  const cursorPath = path.join(cursorDir, style + '.cur');
   if (!fs.existsSync(cursorPath)) throw new Error('커서 파일을 찾을 수 없습니다: ' + cursorPath);
   const backupPath = path.join(app.getPath('userData'), 'original-system-cursors.json');
   const key = 'HKCU:\\Control Panel\\Cursors';
-  const names = ['Arrow','Hand','Help','AppStarting'];
+  const names = ['Arrow','Help','AppStarting','Wait','Crosshair','IBeam','NWPen','No','SizeNS','SizeWE','SizeNWSE','SizeNESW','SizeAll','UpArrow','Hand','Pin','Person'];
   const script = `
     $ErrorActionPreference = 'Stop'
     $key = ${psQuote(key)}
     $backup = ${psQuote(backupPath)}
-    $names = @('Arrow','Hand','Help','AppStarting')
+    $names = @('Arrow','Help','AppStarting','Wait','Crosshair','IBeam','NWPen','No','SizeNS','SizeWE','SizeNWSE','SizeNESW','SizeAll','UpArrow','Hand','Pin','Person')
     if (-not (Test-Path -LiteralPath $backup)) {
       $props = Get-ItemProperty -LiteralPath $key
       $saved = @{}
       foreach ($name in $names) { $value = $props.PSObject.Properties[$name]; if ($null -ne $value) { $saved[$name] = [string]$value.Value } }
       $saved | ConvertTo-Json | Set-Content -LiteralPath $backup -Encoding UTF8
     }
-    foreach ($name in $names) { Set-ItemProperty -LiteralPath $key -Name $name -Value ${psQuote(cursorPath)} -Type String }
+    foreach ($name in $names) { Set-ItemProperty -LiteralPath $key -Name $name -Value ${psQuote(cursorPath)} }
     Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public class CursorNative { [DllImport("user32.dll", SetLastError=true)] public static extern bool SystemParametersInfo(uint action, uint param, IntPtr value, uint flags); }'
     [void][CursorNative]::SystemParametersInfo(0x0057, 0, [IntPtr]::Zero, 0x03)
     Write-Output 'Applied'
@@ -55,7 +56,7 @@ async function restoreSystemCursor() {
     $backup = ${psQuote(backupPath)}
     if (-not (Test-Path -LiteralPath $backup)) { throw '저장된 원래 커서 설정이 없습니다.' }
     $saved = Get-Content -LiteralPath $backup -Raw | ConvertFrom-Json
-    foreach ($name in @('Arrow','Hand','Help','AppStarting')) {
+    foreach ($name in @('Arrow','Help','AppStarting','Wait','Crosshair','IBeam','NWPen','No','SizeNS','SizeWE','SizeNWSE','SizeNESW','SizeAll','UpArrow','Hand','Pin','Person')) {
       $property = $saved.PSObject.Properties[$name]
       if ($null -ne $property) { Set-ItemProperty -LiteralPath $key -Name $name -Value ([string]$property.Value) -Type String }
       else { Remove-ItemProperty -LiteralPath $key -Name $name -ErrorAction SilentlyContinue }
