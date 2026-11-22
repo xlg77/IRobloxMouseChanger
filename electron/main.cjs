@@ -105,7 +105,7 @@ function startMouseButtonMonitor() {
   child.stdout.setEncoding('utf8');
   child.stdout.on('data', chunk => {
     pending += chunk;
-    const lines = pending.split(/\\r?\\n/);
+    const lines = pending.split(/\r?\n/);
     pending = lines.pop() || '';
     for (const line of lines) {
       const [phase, button] = line.trim().split(':');
@@ -139,7 +139,7 @@ function createOverlay(settings = overlaySettings) {
   });
   overlayWindow.setAlwaysOnTop(true, 'screen-saver');
   overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  overlayWindow.setIgnoreMouseEvents(true);
   overlayWindow.setContentProtection(true);
   if (dev) overlayWindow.loadURL('http://127.0.0.1:5173/desktop.html#/overlay');
   else overlayWindow.loadFile(path.join(__dirname, '../dist/desktop.html'), { hash: '/overlay' });
