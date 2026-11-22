@@ -78,7 +78,7 @@ export default function App(){
       <button className={page==='cursors'?'nav-item active':'nav-item'} onClick={()=>setPage('cursors')}><MousePointer2 size={18}/> 커서 라이브러리 <span>8</span></button>
       <button className={page==='customize'?'nav-item active':'nav-item'} onClick={()=>setPage('customize')}><SlidersHorizontal size={18}/> 커스터마이징</button>
       <button className={page==='code'?'nav-item active':'nav-item'} onClick={()=>setPage('code')}><Code2 size={18}/> React 코드</button>
-      <div className="sidebar-bottom"><div className="status-card"><span className="status-dot"/><div><b>Windows 오버레이</b><small>투명 배경 · 클릭 통과</small></div></div><small className="version">VERSION 1.0.0 · XLG77</small></div>
+      <div className="sidebar-bottom"><div className="status-card"><span className="status-dot"/><div><b>Windows 오버레이</b><small>투명 배경 · 클릭 통과</small></div></div><small className="version">VERSION 1.0.1 · XLG77</small></div>
     </aside>
     <main className="main-area">
       <header className="topbar"><div><span className="breadcrumb">CURSOR STUDIO</span><ChevronRight size={14}/><b>{({home:'대시보드',cursors:'커서 라이브러리',customize:'커스터마이징',code:'React 코드'})[page]}</b></div><div className="top-actions"><span className="windows-chip"><Monitor size={14}/> WINDOWS</span><button className="icon-btn" title="정보"><Info size={17}/></button></div></header>
