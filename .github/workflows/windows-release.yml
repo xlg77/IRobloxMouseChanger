@@ -1,0 +1,47 @@
+name: Build Windows installer and publish release
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: windows-release
+  cancel-in-progress: false
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Windows installer
+        run: npm run dist
+
+      - name: Publish installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.1
+          target_commitish: ${{ github.sha }}
+          name: IRobloxMouseChanger v1.0.1
+          body: |
+            Windows installer for IRobloxMouseChanger.
+
+            Download `IRobloxMouseChanger-Setup-1.0.1.exe` below.
+          files: release/IRobloxMouseChanger-Setup-1.0.1.exe
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
