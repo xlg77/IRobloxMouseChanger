@@ -10,7 +10,7 @@
 The root `index.html` is the React + Vite landing page. The existing GitHub Actions Pages workflow should install dependencies and run `npm run build`; Vite outputs the site to `dist/`. The build also includes `desktop.html`, the separate Electron renderer entry.
 
 ## Desktop app
-Run `npm install` then `npm run dev`. To create a Windows installer on Windows, run `npm run dist`. Publish the resulting installer from `release/` as an asset on GitHub Releases.
+Run `npm install` then `npm run dev`. To create a Windows installer on Windows, run `npm run dist`. The GitHub Actions workflow `.github/workflows/windows-release.yml` builds the Windows NSIS installer and publishes it to the `v1.0.1` GitHub Release automatically when this commit reaches `main`.
 
 ## Features
 - Eight cursor styles: Glow, Swarm, Ghost, Target, Fluid Glass, Text, Splash, and Blob.
