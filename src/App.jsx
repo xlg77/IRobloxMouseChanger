@@ -47,7 +47,8 @@ function Overlay({settings, onClose, customComponent}) {
 }
 
 export default function App(){
-  const isOverlay = window.location.hash.includes('/overlay');
+  const isOverlay = window.location.hash.includes('/overlay') && !window.location.hash.includes('/overlay-controls');
+  const isOverlayControls = window.location.hash.includes('/overlay-controls');
   const [page,setPage]=useState('home');
   const [systemMessage,setSystemMessage]=useState('');
   const [systemBusy,setSystemBusy]=useState(false);
@@ -71,6 +72,7 @@ export default function App(){
       setCustomComponent(()=>Component); update('cursor','custom'); setCustomError('');
     } catch(e){setCustomError(e.message||'코드를 확인해 주세요.');}
   };
+  if(isOverlayControls) return <div style={{width:'100%',height:'100%',boxSizing:'border-box',padding:12,fontFamily:'Segoe UI, sans-serif',color:'#fff',background:'rgba(17,25,45,.96)',border:'1px solid rgba(130,160,230,.45)',borderRadius:14,boxShadow:'0 10px 35px rgba(0,0,0,.35)'}}><div style={{fontSize:12,fontWeight:800,letterSpacing:'.08em',marginBottom:9,color:'#b9ccff'}}>IROBLOXMOUSECHANGER · OVERLAY</div><button onClick={()=>window.mouseChanger?.restoreAndStopOverlay()} style={{width:'100%',border:0,borderRadius:9,padding:'10px 8px',background:'#6e91ff',color:'#fff',fontWeight:800,cursor:'pointer'}}>↩ 원래 커서 복원 및 오버레이 종료</button><button onClick={()=>window.mouseChanger?.closeOverlayOnly()} style={{width:'100%',marginTop:6,border:'1px solid #56627d',borderRadius:9,padding:'7px',background:'transparent',color:'#dce5ff',cursor:'pointer'}}>오버레이만 종료</button></div>;
   if(isOverlay) return <Overlay settings={settings} onClose={stop} customComponent={customComponent}/>;
   return <div className="app-shell">
     <aside className="sidebar">
