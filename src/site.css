@@ -29,3 +29,10 @@
 .live-demo .c-blob b{display:none}
 @keyframes swarm-orbit{to{transform:rotate(calc(var(--i)*40deg + 360deg)) translateY(-19px)}}
 @media(max-width:620px){.live-demo{height:230px}.demo-copy span{max-width:220px;line-height:1.5}}
+
+.live-demo .c-target i{width:14px;height:14px;inset:auto;border:0;border-color:var(--c);border-style:solid}
+.live-demo .c-target .tl{left:7px;top:7px;border-width:2px 0 0 2px}
+.live-demo .c-target .tr{right:7px;top:7px;border-width:2px 2px 0 0}
+.live-demo .c-target .bl{left:7px;bottom:7px;border-width:0 0 2px 2px}
+.live-demo .c-target .br{right:7px;bottom:7px;border-width:0 2px 2px 0}
+.live-demo .c-splash:after{content:'';position:absolute;inset:19px;border-radius:50%;background:var(--c);box-shadow:0 0 15px var(--c)}
