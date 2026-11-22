@@ -2,10 +2,11 @@
   "name": "irobloxmousechanger",
   "version": "1.0.0",
   "private": true,
-  "description": "Transparent React cursor overlay for Roblox on Windows",
+  "description": "React + Electron cursor customization app for Windows with a GitHub Pages landing page",
   "main": "electron/main.cjs",
+  "homepage": "https://xlg77.github.io/IRobloxMouseChanger/",
   "scripts": {
-    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173/desktop.html && electron .\"",
     "build": "vite build",
     "start": "electron .",
     "dist": "npm run build && electron-builder --win nsis"
@@ -27,23 +28,9 @@
   "build": {
     "appId": "com.xlg77.irobloxmousechanger",
     "productName": "IRobloxMouseChanger",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "package.json"
-    ],
-    "win": {
-      "target": [
-        "nsis"
-      ],
-      "artifactName": "IRobloxMouseChanger-Setup-${version}.${ext}"
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true
-    }
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "electron/**/*", "package.json"],
+    "win": { "target": ["nsis"], "artifactName": "IRobloxMouseChanger-Setup-${version}.${ext}" },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }
 }
