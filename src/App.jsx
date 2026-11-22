@@ -1,3 +1,60 @@
+import React, { useEffect, useState } from 'react';
+import * as Babel from '@babel/standalone';
+import {
+  Check, ChevronRight, Code2, Info, Monitor, MousePointer2,
+  Palette, Play, RotateCcw, Settings2, SlidersHorizontal, Sparkles
+} from 'lucide-react';
+import GlowCursor from './cursors/GlowCursor.jsx';
+import SwarmCursor from './cursors/SwarmCursor.jsx';
+import GhostCursor from './cursors/GhostCursor.jsx';
+import TargetCursor from './cursors/TargetCursor.jsx';
+import FluidGlass from './cursors/FluidGlass.jsx';
+import TextCursor from './cursors/TextCursor.jsx';
+import SplashCursor from './cursors/SplashCursor.jsx';
+import BlobCursor from './cursors/BlobCursor.jsx';
+
+const CURSORS = [
+  { id: 'glow', name: 'Glow Cursor', tag: 'LIGHT', desc: '부드러운 빛과 잔상 효과', color: '#a78bfa', icon: <Sparkles size={18} /> },
+  { id: 'swarm', name: 'Swarm Cursor', tag: 'PARTICLES', desc: '마우스를 따라오는 입자', color: '#65e6c5', icon: <MousePointer2 size={18} /> },
+  { id: 'ghost', name: 'Ghost Cursor', tag: 'TRAIL', desc: '부드럽게 이어지는 잔상', color: '#8bc5ff', icon: <Sparkles size={18} /> },
+  { id: 'target', name: 'Target Cursor', tag: 'PRECISION', desc: '정밀한 조준점 스타일', color: '#ff819e', icon: <Monitor size={18} /> },
+  { id: 'fluid', name: 'Fluid Glass', tag: 'FLUID', desc: '유리처럼 흐르는 입체 효과', color: '#83e5f4', icon: <Palette size={18} /> },
+  { id: 'text', name: 'Text Cursor', tag: 'TYPOGRAPHY', desc: '텍스트가 나타나는 커서', color: '#f3d27b', icon: <Code2 size={18} /> },
+  { id: 'splash', name: 'Splash Cursor', tag: 'LIQUID', desc: '움직임에 반응하는 물방울', color: '#ff9a6d', icon: <Sparkles size={18} /> },
+  { id: 'blob', name: 'Blob Cursor', tag: '3D', desc: '유기적인 3D 형태', color: '#bd9cff', icon: <Palette size={18} /> }
+];
+
+const DEFAULT_CODE = `function Cursor({ color = '#78a8ff', size = 32 }) {
+  return (
+    <div style={{
+      width: size,
+      height: size,
+      borderRadius: '50%',
+      background: color,
+      boxShadow: '0 0 24px ' + color,
+      pointerEvents: 'none'
+    }} />
+  );
+}`;
+
+function CursorGraphic({ type = 'glow', color = '#78a8ff', size = 32 }) {
+  const style = { '--cursor-size': size + 'px', '--cursor-color': color, '--speed': 1 };
+  const swarm = Array.from({ length: 12 }, (_, i) => <i className="swarm-dot" key={i} style={{ '--i': i }} />);
+  const drops = Array.from({ length: 8 }, (_, i) => <i className="splash-drop" key={i} style={{ '--i': i }} />);
+  let parts;
+  switch (type) {
+    case 'swarm': parts = swarm; break;
+    case 'ghost': parts = <><i className="ghost-ring ghost-a" /><i className="ghost-ring ghost-b" /><i className="ghost-ring" /><i className="ghost-core" /></>; break;
+    case 'target': parts = <><i className="target-corner tl" /><i className="target-corner tr" /><i className="target-corner bl" /><i className="target-corner br" /><i className="target-dot" /></>; break;
+    case 'fluid': parts = <i className="fluid-ball" />; break;
+    case 'text': parts = <><b className="text-stamp">Aa</b><i className="text-caret" /></>; break;
+    case 'splash': parts = <><i className="splash-core" />{drops}</>; break;
+    case 'blob': parts = <i className="blob-shape" />; break;
+    default: parts = <><i className="glow-halo" /><i className="glow-core" /></>;
+  }
+  return <span className={'cursor-art cursor-' + type} style={style} aria-hidden="true">{parts}</span>;
+}
+
 function Overlay({settings, onClose, customComponent}) {
   const [liveSettings,setLiveSettings]=useState(settings || {cursor:'glow',color:'#78a8ff',size:30,trail:65,speed:1,opacity:100});
   useEffect(()=>{
@@ -77,7 +134,7 @@ export default function App(){
       <button className={page==='customize'?'nav-item active':'nav-item'} onClick={()=>setPage('customize')}><SlidersHorizontal size={18}/> 커스터마이징</button>
       <button className={page==='system'?'nav-item active':'nav-item'} onClick={()=>{setPage('system');setSystemMessage('');}}><Monitor size={18}/> Windows 시스템 커서</button>
       <button className={page==='code'?'nav-item active':'nav-item'} onClick={()=>setPage('code')}><Code2 size={18}/> React 코드</button>
-      <div className="sidebar-bottom"><div className="status-card"><span className="status-dot"/><div><b>Windows 오버레이</b><small>투명 배경 · 클릭 통과</small></div></div><small className="version">VERSION 1.0.7 · XLG77</small></div>
+      <div className="sidebar-bottom"><div className="status-card"><span className="status-dot"/><div><b>Windows 오버레이</b><small>투명 배경 · 클릭 통과</small></div></div><small className="version">VERSION 1.0.8 · XLG77</small></div>
     </aside>
     <main className="main-area">
       <header className="topbar"><div><span className="breadcrumb">CURSOR STUDIO</span><ChevronRight size={14}/><b>{({home:'대시보드',cursors:'커서 라이브러리',customize:'커스터마이징',system:'Windows 시스템 커서',code:'React 코드'})[page]}</b></div><div className="top-actions"><span className="windows-chip"><Monitor size={14}/> WINDOWS</span><button className="icon-btn" title="정보"><Info size={17}/></button></div></header>
