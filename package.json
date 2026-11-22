@@ -1,6 +1,6 @@
 {
   "name": "irobloxmousechanger",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "description": "React + Electron cursor customization app for Windows with a GitHub Pages landing page",
   "main": "electron/main.cjs",
@@ -9,7 +9,8 @@
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173/desktop.html && electron .\"",
     "build": "vite build",
     "start": "electron .",
-    "dist": "npm run build && electron-builder --win nsis"
+    "dist": "npm run generate:cursors && npm run build && electron-builder --win nsis",
+    "generate:cursors": "node scripts/generate-cursors.cjs"
   },
   "dependencies": {
     "lucide-react": "^0.468.0",
@@ -46,6 +47,15 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true
-    }
+    },
+    "extraResources": [
+      {
+        "from": "resources/cursors",
+        "to": "cursors",
+        "filter": [
+          "*.cur"
+        ]
+      }
+    ]
   }
 }
