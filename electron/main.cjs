@@ -1,6 +1,9 @@
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, desktopCapturer } = require('electron');
 const path = require('path');
 let mainWindow, overlayWindow, controlWindow, tray;
+let screenAnalysisTimer = null;
+let screenCaptureBusy = false;
+let overlayDisplayId = null;
 let overlaySettings = { cursor: 'glow', color: '#78a8ff', size: 30, trail: 65, speed: 1, opacity: 100 };
 const dev = !app.isPackaged;
 
@@ -76,17 +79,39 @@ function createMain() {
   if (dev) mainWindow.loadURL('http://127.0.0.1:5173/desktop.html'); else mainWindow.loadFile(path.join(__dirname, '../dist/desktop.html'));
   mainWindow.on('closed', () => mainWindow = null);
 }
+async function captureOverlayScreen() {
+  if (!overlayWindow || overlayWindow.isDestroyed() || screenCaptureBusy) return;
+  screenCaptureBusy = true;
+  try {
+    const display = screen.getAllDisplays().find(item => item.id === overlayDisplayId) || screen.getPrimaryDisplay();
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 640, height: 360 }, fetchWindowIcons: false });
+    const source = sources.find(item => String(item.display_id) === String(display.id)) || sources[0];
+    if (!source || source.thumbnail.isEmpty() || !overlayWindow || overlayWindow.isDestroyed()) return;
+    const size = source.thumbnail.getSize();
+    overlayWindow.webContents.send('screen-frame', { dataUrl: source.thumbnail.toDataURL(), width: size.width, height: size.height, bounds: display.bounds, capturedAt: Date.now() });
+  } catch (error) {
+    console.warn('Screen UI analysis capture failed:', error);
+  } finally {
+    screenCaptureBusy = false;
+  }
+}
+
 function createOverlay(settings = overlaySettings) {
   overlaySettings = settings || overlaySettings;
   if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.webContents.send('overlay:settings', overlaySettings); if (!controlWindow || controlWindow.isDestroyed()) createOverlayControls(); return; }
   const displays = screen.getAllDisplays();
   const bounds = displays.find(d => d.bounds.x === 0 && d.bounds.y === 0) || screen.getPrimaryDisplay();
+  overlayDisplayId = bounds.id;
   overlayWindow = new BrowserWindow({ x: bounds.bounds.x, y: bounds.bounds.y, width: bounds.bounds.width, height: bounds.bounds.height, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, resizable: false, movable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, fullscreen: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
   overlayWindow.setAlwaysOnTop(true, 'screen-saver'); overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  overlayWindow.setContentProtection(true);
   if (dev) overlayWindow.loadURL('http://127.0.0.1:5173/desktop.html#/overlay'); else overlayWindow.loadFile(path.join(__dirname, '../dist/desktop.html'), { hash: '/overlay' });
-  overlayWindow.on('closed', () => { overlayWindow = null; if (controlWindow && !controlWindow.isDestroyed()) controlWindow.close(); });
+  overlayWindow.on('closed', () => { overlayWindow = null; overlayDisplayId = null; if (screenAnalysisTimer) { clearInterval(screenAnalysisTimer); screenAnalysisTimer = null; } if (controlWindow && !controlWindow.isDestroyed()) controlWindow.close(); });
   createOverlayControls();
   const timer = setInterval(() => { if (!overlayWindow || overlayWindow.isDestroyed()) { clearInterval(timer); return; } overlayWindow.webContents.send('cursor-position', screen.getCursorScreenPoint()); }, 16);
+  if (screenAnalysisTimer) clearInterval(screenAnalysisTimer);
+  screenAnalysisTimer = setInterval(captureOverlayScreen, 350);
+  setTimeout(captureOverlayScreen, 250);
 }
 function createOverlayControls() {
   if (controlWindow && !controlWindow.isDestroyed()) return;
@@ -99,6 +124,7 @@ function createOverlayControls() {
     webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true }
   });
   controlWindow.setAlwaysOnTop(true, 'screen-saver');
+  controlWindow.setContentProtection(true);
   if (dev) controlWindow.loadURL('http://127.0.0.1:5173/desktop.html#/overlay-controls');
   else controlWindow.loadFile(path.join(__dirname, '../dist/desktop.html'), { hash: '/overlay-controls' });
   controlWindow.on('closed', () => controlWindow = null);

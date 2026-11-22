@@ -7,3 +7,6 @@ html:has(.overlay-root),body:has(.overlay-root),body:has(.overlay-root) #root{ba
 .overlay-effect-stage{position:absolute;inset:0;width:100%;height:100%;overflow:hidden;pointer-events:none;background:transparent!important}
 .overlay-effect-stage>*{pointer-events:none!important}
 .overlay-effect-stage canvas{pointer-events:none!important}
+
+/* Screen-detected game UI reaction */
+.overlay-effect-stage{transition:filter .16s ease,transform .16s ease;transform-origin:center center}.overlay-effect-stage.ui-active{filter:drop-shadow(0 0 13px rgba(125,165,255,.5));transform:scale(1.018)}.overlay-effect-stage.ui-active canvas{filter:brightness(1.18)}

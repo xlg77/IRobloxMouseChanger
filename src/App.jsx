@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import * as Babel from '@babel/standalone';
 import { createPortal } from 'react-dom';
 import { Check, MousePointer2, Gamepad2, SlidersHorizontal, Code2, Play, Square, Eye, Sparkles, Settings2, Monitor, ChevronRight, Palette, RotateCcw, Info, X } from 'lucide-react';
@@ -46,11 +46,50 @@ function CursorGraphic({ type, x=220, y=180, color='#78a8ff', size=30, trail=65,
 
 function Overlay({settings, onClose, customComponent}) {
   const [liveSettings,setLiveSettings]=useState(settings || {cursor:'glow',color:'#78a8ff',size:30,trail:65,speed:1,opacity:100});
+  const [uiActive,setUiActive]=useState(false);
+  const pointerRef=useRef(null);
+  const uiScoreRef=useRef(0);
   useEffect(()=>{
     let alive=true;
     window.mouseChanger?.getOverlaySettings?.().then(value=>{if(alive&&value)setLiveSettings(value);}).catch(()=>{});
     const off=window.mouseChanger?.onOverlaySettings?.(value=>{if(value)setLiveSettings(value);});
-    return ()=>{alive=false;off?.();};
+    const offCursor=window.mouseChanger?.onCursorPosition?.(point=>{pointerRef.current=point;});
+    const offFrame=window.mouseChanger?.onScreenFrame?.(frame=>{
+      const point=pointerRef.current;
+      if(!point || !frame?.dataUrl || !frame.bounds) return;
+      const image=new Image();
+      image.onload=()=>{
+        if(!alive) return;
+        const px=Math.round((point.x-frame.bounds.x)/frame.bounds.width*image.width);
+        const py=Math.round((point.y-frame.bounds.y)/frame.bounds.height*image.height);
+        const radiusX=Math.max(12,Math.round(image.width*90/frame.bounds.width));
+        const radiusY=Math.max(10,Math.round(image.height*58/frame.bounds.height));
+        const left=Math.max(1,px-radiusX), right=Math.min(image.width-1,px+radiusX);
+        const top=Math.max(1,py-radiusY), bottom=Math.min(image.height-1,py+radiusY);
+        if(right-left<8 || bottom-top<8) return;
+        const canvas=document.createElement('canvas');
+        canvas.width=image.width; canvas.height=image.height;
+        const context=canvas.getContext('2d',{willReadFrequently:true});
+        if(!context) return;
+        context.drawImage(image,0,0,image.width,image.height);
+        const pixels=context.getImageData(left,top,right-left,bottom-top).data;
+        const patchWidth=right-left, patchHeight=bottom-top;
+        const lumaAt=(x,y)=>{const i=(y*patchWidth+x)*4;return pixels[i]*0.2126+pixels[i+1]*0.7152+pixels[i+2]*0.0722;};
+        let edgeCount=0,samples=0,sum=0,sumSq=0;
+        for(let y=1;y<patchHeight-1;y+=2) for(let x=1;x<patchWidth-1;x+=2){
+          const value=lumaAt(x,y);
+          if(Math.abs(value-lumaAt(x-1,y))>34 || Math.abs(value-lumaAt(x,y-1))>34) edgeCount++;
+          sum+=value; sumSq+=value*value; samples++;
+        }
+        const variance=samples?sumSq/samples-(sum/samples)**2:0;
+        const edgeRatio=samples?edgeCount/samples:0;
+        const looksLikeUi=edgeRatio>0.075 && variance>190;
+        uiScoreRef.current=looksLikeUi?Math.min(3,uiScoreRef.current+1):Math.max(0,uiScoreRef.current-1);
+        setUiActive(uiScoreRef.current>=2);
+      };
+      image.src=frame.dataUrl;
+    });
+    return ()=>{alive=false;off?.();offCursor?.();offFrame?.();};
   },[]);
   useEffect(()=>{const key=e=>{if(e.key==='Escape') onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[onClose]);
   const color=liveSettings.color || '#78a8ff';
@@ -65,10 +104,9 @@ function Overlay({settings, onClose, customComponent}) {
   else if(id==='text') effect=<TextCursor text="Aa" color={color} fontSize={Math.max(14,size)} hideCursor={false} style={style}/>;
   else if(id==='splash') effect=<SplashCursor colors={[color]} rainbow={false} size={Math.max(.35,size/30)} theme="dark" style={style}/>;
   else if(id==='blob') effect=<BlobCursor color={color} size={Math.max(48,size*4)} hideCursor={false} style={style}/>;
-  else effect=<GlowCursor color={color} trailWidth={Math.max(.5,size/10)} glow={1.2} quality="high" enabled style={style}/>;
-  return <div className="overlay-root" aria-hidden="true"><div className="overlay-effect-stage">{effect}</div></div>;
+  else effect=<GlowCursor color={color} trailWidth={Math.max(.5,size/10)} glow={uiActive?2:1.2} quality="high" enabled style={style}/>;
+  return <div className="overlay-root" aria-hidden="true"><div className={`overlay-effect-stage${uiActive?' ui-active':''}`}>{effect}</div></div>;
 }
-
 export default function App(){
   const isOverlay = window.location.hash.includes('/overlay') && !window.location.hash.includes('/overlay-controls');
   const isOverlayControls = window.location.hash.includes('/overlay-controls');

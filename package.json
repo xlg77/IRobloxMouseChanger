@@ -1,6 +1,6 @@
 {
   "name": "irobloxmousechanger",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "private": true,
   "description": "React + Electron cursor customization app for Windows with a GitHub Pages landing page",
   "main": "electron/main.cjs",
