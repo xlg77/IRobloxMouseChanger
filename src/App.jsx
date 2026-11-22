@@ -32,7 +32,7 @@ function Overlay({settings, onClose, customComponent}) {
   let effect;
   if(id==='swarm') effect=<SwarmCursor color={color} accentColor={color} size={Math.max(1.2,size/12)} count={360} dpr={1} speed={liveSettings.speed||1} hideCursor={false} intro={false} style={style}/>;
   else if(id==='ghost') effect=<GhostCursor color={color} size={Math.max(24,size*2.6)} trailLength={Math.max(1,liveSettings.trail||50)} maxDevicePixelRatio={1} targetPixels={300000} intro={false} style={style}/>;
-  else if(id==='target') effect=<TargetCursor color={color} size={size} style={style}/>;
+  else if(id==='target') effect=<TargetCursor cursorColor={color} size={size} hideDefaultCursor={false} showLabel={false}/>;
   else if(id==='fluid') effect=<FluidGlass color={color} size={Math.max(100,size*4)} interaction="follow" maxDevicePixelRatio={1} intro={false} style={style}/>;
   else if(id==='text') effect=<TextCursor text="Aa" color={color} fontSize={Math.max(14,size)} hideCursor={false} style={style}/>;
   else if(id==='splash') effect=<SplashCursor colors={[color]} rainbow={false} size={Math.max(.35,size/30)} quality="medium" intro={false} theme="dark" style={style}/>;
