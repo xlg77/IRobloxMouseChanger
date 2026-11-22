@@ -1,109 +1,28 @@
-import React, { useEffect, useRef, useState } from 'react';
-import * as Babel from '@babel/standalone';
-import { createPortal } from 'react-dom';
-import { Check, MousePointer2, Gamepad2, SlidersHorizontal, Code2, Play, Square, Eye, Sparkles, Settings2, Monitor, ChevronRight, Palette, RotateCcw, Info, X } from 'lucide-react';
-import GlowCursor from './cursors/GlowCursor.jsx';
-import SwarmCursor from './cursors/SwarmCursor.jsx';
-import GhostCursor from './cursors/GhostCursor.jsx';
-import TargetCursor from './cursors/TargetCursor.jsx';
-import FluidGlass from './cursors/FluidGlass.jsx';
-import TextCursor from './cursors/TextCursor.jsx';
-import SplashCursor from './cursors/SplashCursor.jsx';
-import BlobCursor from './cursors/BlobCursor.jsx';
-
-const CURSORS = [
-  { id:'glow', name:'Glow Cursor', desc:'부드러운 빛 번짐 효과', tag:'GLOW', icon:'✦', color:'#78a8ff' },
-  { id:'swarm', name:'Swarm Cursor', desc:'작은 입자들이 따라오는 효과', tag:'PARTICLE', icon:'✣', color:'#9c8cff' },
-  { id:'ghost', name:'Ghost Cursor', desc:'안개처럼 흐르는 잔상', tag:'TRAIL', icon:'◌', color:'#72e6d0' },
-  { id:'target', name:'Target Cursor', desc:'네 모서리 조준선 스타일', tag:'TARGET', icon:'⌗', color:'#ffb36b' },
-  { id:'fluid', name:'Fluid Glass', desc:'유리 구슬 같은 포인터', tag:'GLASS', icon:'◉', color:'#a4c8ff' },
-  { id:'text', name:'Text Cursor', desc:'움직임을 따라 글자가 남는 효과', tag:'TEXT', icon:'Aa', color:'#ff8eb5' },
-  { id:'splash', name:'Splash Cursor', desc:'물감이 퍼지는 듯한 효과', tag:'SPLASH', icon:'✺', color:'#ffa3e0' },
-  { id:'blob', name:'Blob Cursor', desc:'말랑한 젤리 형태의 포인터', tag:'BLOB', icon:'●', color:'#8ed7ff' }
-];
-const DEFAULT_CODE = `function Cursor({ x, y, color, size }) {\n  return (\n    <div style={{\n      position: 'absolute', left: x, top: y,\n      width: size, height: size, borderRadius: '50%',\n      background: color, transform: 'translate(-15%, -15%)',\n      boxShadow: '0 0 18px ' + color,\n      pointerEvents: 'none'\n    }} />\n  );\n}`;
-
-function CursorGraphic({ type, x=220, y=180, color='#78a8ff', size=30, trail=65, speed=1, opacity=100, preview=false }) {
-  const [history,setHistory] = useState([]);
-  useEffect(() => {
-    if (preview) return;
-    setHistory(h => [...h.slice(-18), {x,y,id:Date.now()+Math.random()}]);
-  }, [x,y,preview]);
-  const style = { '--cursor-color': color, '--cursor-size': `${size}px`, '--trail': `${trail/100}`, '--speed': speed, opacity: opacity/100 };
-  const tail = history.slice(-Math.max(2,Math.round(trail/7)));
-  return <div className={`cursor-art cursor-${type}`} style={style}>
-    {!preview && tail.map((p,i)=><i key={p.id} className="trail-dot" style={{left:p.x,top:p.y,opacity:(i+1)/tail.length*.34,transform:`translate(-50%,-50%) scale(${(i+1)/tail.length})`}}/>)}
-    {type==='glow' && <><i className="glow-halo"/><i className="glow-core"/></>}
-    {type==='swarm' && Array.from({length:12},(_,i)=><i key={i} className="swarm-dot" style={{'--i':i, background:color}}/>)}
-    {type==='ghost' && <><i className="ghost-ring ghost-a"/><i className="ghost-ring ghost-b"/><i className="ghost-core"/></>}
-    {type==='target' && <><i className="target-corner tl"/><i className="target-corner tr"/><i className="target-corner bl"/><i className="target-corner br"/><i className="target-dot"/></>}
-    {type==='fluid' && <i className="fluid-ball"/>}
-    {type==='text' && <><b className="text-stamp">Aa</b><i className="text-caret"/></>}
-    {type==='splash' && <><i className="splash-core"/>{Array.from({length:8},(_,i)=><i key={i} className="splash-drop" style={{'--i':i}}/>)}</>}
-    {type==='blob' && <i className="blob-shape"/>}
-  </div>;
-}
-
 function Overlay({settings, onClose, customComponent}) {
   const [liveSettings,setLiveSettings]=useState(settings || {cursor:'glow',color:'#78a8ff',size:30,trail:65,speed:1,opacity:100});
-  const [uiActive,setUiActive]=useState(false);
-  const pointerRef=useRef(null);
-  const uiScoreRef=useRef(0);
   useEffect(()=>{
     let alive=true;
-    let frameSequence=0;
-    const analysisImage=new Image();
-    const analysisCanvas=document.createElement('canvas');
-    const analysisContext=analysisCanvas.getContext('2d',{willReadFrequently:true});
     window.mouseChanger?.getOverlaySettings?.().then(value=>{if(alive&&value)setLiveSettings(value);}).catch(()=>{});
-    const off=window.mouseChanger?.onOverlaySettings?.(value=>{if(value)setLiveSettings(value);});
-    const offCursor=window.mouseChanger?.onCursorPosition?.(point=>{
-      pointerRef.current=point;
-      const bounds=point?.bounds;
-      if(!bounds) return;
-      const clientX=point.x-bounds.x;
-      const clientY=point.y-bounds.y;
-      const eventOptions={bubbles:true,cancelable:false,view:window,clientX,clientY,screenX:point.x,screenY:point.y,pointerId:1,pointerType:'mouse',isPrimary:true,buttons:0};
-      window.dispatchEvent(new PointerEvent('pointermove',eventOptions));
-      window.dispatchEvent(new MouseEvent('mousemove',eventOptions));
+    const offSettings=window.mouseChanger?.onOverlaySettings?.(value=>{if(value)setLiveSettings(value);});
+    const dispatchPointer=(phase,point,button='left')=>{
+      if(!point?.bounds) return;
+      const clientX=point.x-point.bounds.x;
+      const clientY=point.y-point.bounds.y;
+      const target=document.querySelector('.text-cursor') || document.querySelector('.overlay-effect-stage') || document.documentElement;
+      const isDown=phase==='pointerdown';
+      const buttonCode=button==='right'?2:0;
+      target.dispatchEvent(new PointerEvent(phase,{
+        bubbles:true,cancelable:false,view:window,clientX,clientY,
+        screenX:point.x,screenY:point.y,pointerId:1,pointerType:'mouse',
+        isPrimary:true,button:buttonCode,buttons:isDown?(button==='right'?2:1):0
+      }));
+    };
+    const offMove=window.mouseChanger?.onCursorPosition?.(point=>dispatchPointer('pointermove',point));
+    const offButton=window.mouseChanger?.onCursorButton?.(event=>{
+      if(event?.phase==='down') dispatchPointer('pointerdown',event,event.button);
+      else if(event?.phase==='up') dispatchPointer('pointerup',event,event.button);
     });
-    const offFrame=window.mouseChanger?.onScreenFrame?.(frame=>{
-      const point=pointerRef.current;
-      if(!point || !frame?.dataUrl || !frame.bounds || !analysisContext) return;
-      const sequence=++frameSequence;
-      analysisImage.onload=()=>{
-        if(!alive || sequence!==frameSequence) return;
-        const px=Math.round((point.x-frame.bounds.x)/frame.bounds.width*analysisImage.width);
-        const py=Math.round((point.y-frame.bounds.y)/frame.bounds.height*analysisImage.height);
-        const radiusX=Math.max(8,Math.round(analysisImage.width*90/frame.bounds.width));
-        const radiusY=Math.max(7,Math.round(analysisImage.height*58/frame.bounds.height));
-        const left=Math.max(0,px-radiusX), right=Math.min(analysisImage.width,px+radiusX);
-        const top=Math.max(0,py-radiusY), bottom=Math.min(analysisImage.height,py+radiusY);
-        const patchWidth=right-left, patchHeight=bottom-top;
-        if(patchWidth<8 || patchHeight<8) return;
-        if(analysisCanvas.width!==patchWidth || analysisCanvas.height!==patchHeight){
-          analysisCanvas.width=patchWidth;
-          analysisCanvas.height=patchHeight;
-        }
-        analysisContext.drawImage(analysisImage,left,top,patchWidth,patchHeight,0,0,patchWidth,patchHeight);
-        const pixels=analysisContext.getImageData(0,0,patchWidth,patchHeight).data;
-        const lumaAt=(x,y)=>{const i=(y*patchWidth+x)*4;return pixels[i]*0.2126+pixels[i+1]*0.7152+pixels[i+2]*0.0722;};
-        let edgeCount=0,samples=0,sum=0,sumSq=0;
-        for(let y=1;y<patchHeight-1;y+=2) for(let x=1;x<patchWidth-1;x+=2){
-          const value=lumaAt(x,y);
-          if(Math.abs(value-lumaAt(x-1,y))>34 || Math.abs(value-lumaAt(x,y-1))>34) edgeCount++;
-          sum+=value; sumSq+=value*value; samples++;
-        }
-        const variance=samples?sumSq/samples-(sum/samples)**2:0;
-        const edgeRatio=samples?edgeCount/samples:0;
-        const looksLikeUi=edgeRatio>0.075 && variance>190;
-        uiScoreRef.current=looksLikeUi?Math.min(3,uiScoreRef.current+1):Math.max(0,uiScoreRef.current-1);
-        const active=uiScoreRef.current>=2;
-        setUiActive(previous=>previous===active?previous:active);
-      };
-      analysisImage.src=frame.dataUrl;
-    });
-    return ()=>{alive=false;frameSequence++;off?.();offCursor?.();offFrame?.();};
+    return ()=>{alive=false;offSettings?.();offMove?.();offButton?.();};
   },[]);
   useEffect(()=>{const key=e=>{if(e.key==='Escape') onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[onClose]);
   const color=liveSettings.color || '#78a8ff';
@@ -113,13 +32,13 @@ function Overlay({settings, onClose, customComponent}) {
   let effect;
   if(id==='swarm') effect=<SwarmCursor color={color} accentColor={color} size={Math.max(1.2,size/12)} count={360} dpr={1} speed={liveSettings.speed||1} hideCursor={false} intro={false} style={style}/>;
   else if(id==='ghost') effect=<GhostCursor color={color} size={Math.max(24,size*2.6)} trailLength={Math.max(1,liveSettings.trail||50)} maxDevicePixelRatio={1} targetPixels={300000} intro={false} style={style}/>;
-  else if(id==='target') effect=<TargetCursor cursorColor={color} size={Math.max(18,size*1.2)} hideDefaultCursor={false}/>;
+  else if(id==='target') effect=<TargetCursor color={color} size={size} style={style}/>;
   else if(id==='fluid') effect=<FluidGlass color={color} size={Math.max(100,size*4)} interaction="follow" maxDevicePixelRatio={1} intro={false} style={style}/>;
   else if(id==='text') effect=<TextCursor text="Aa" color={color} fontSize={Math.max(14,size)} hideCursor={false} style={style}/>;
   else if(id==='splash') effect=<SplashCursor colors={[color]} rainbow={false} size={Math.max(.35,size/30)} quality="medium" intro={false} theme="dark" style={style}/>;
   else if(id==='blob') effect=<BlobCursor color={color} size={Math.max(48,size*4)} hideCursor={false} trail={10} style={style}/>;
-  else effect=<GlowCursor color={color} trailWidth={Math.max(.5,size/10)} glow={uiActive?2:1.2} quality="medium" maxDevicePixelRatio={1} style={style}/>;
-  return <div className="overlay-root" aria-hidden="true"><div className={`overlay-effect-stage${uiActive?' ui-active':''}`}>{id==='custom'&&customComponent?React.createElement(customComponent):effect}</div></div>;
+  else effect=<GlowCursor color={color} trailWidth={Math.max(.5,size/10)} glow={1.2} quality="medium" maxDevicePixelRatio={1} style={style}/>;
+  return <div className="overlay-root" aria-hidden="true"><div className="overlay-effect-stage">{id==='custom'&&customComponent?React.createElement(customComponent):effect}</div></div>;
 }
 export default function App(){
   const isOverlay = window.location.hash.includes('/overlay') && !window.location.hash.includes('/overlay-controls');
@@ -158,7 +77,7 @@ export default function App(){
       <button className={page==='customize'?'nav-item active':'nav-item'} onClick={()=>setPage('customize')}><SlidersHorizontal size={18}/> 커스터마이징</button>
       <button className={page==='system'?'nav-item active':'nav-item'} onClick={()=>{setPage('system');setSystemMessage('');}}><Monitor size={18}/> Windows 시스템 커서</button>
       <button className={page==='code'?'nav-item active':'nav-item'} onClick={()=>setPage('code')}><Code2 size={18}/> React 코드</button>
-      <div className="sidebar-bottom"><div className="status-card"><span className="status-dot"/><div><b>Windows 오버레이</b><small>투명 배경 · 클릭 통과</small></div></div><small className="version">VERSION 1.0.2 · XLG77</small></div>
+      <div className="sidebar-bottom"><div className="status-card"><span className="status-dot"/><div><b>Windows 오버레이</b><small>투명 배경 · 클릭 통과</small></div></div><small className="version">VERSION 1.0.7 · XLG77</small></div>
     </aside>
     <main className="main-area">
       <header className="topbar"><div><span className="breadcrumb">CURSOR STUDIO</span><ChevronRight size={14}/><b>{({home:'대시보드',cursors:'커서 라이브러리',customize:'커스터마이징',system:'Windows 시스템 커서',code:'React 코드'})[page]}</b></div><div className="top-actions"><span className="windows-chip"><Monitor size={14}/> WINDOWS</span><button className="icon-btn" title="정보"><Info size={17}/></button></div></header>

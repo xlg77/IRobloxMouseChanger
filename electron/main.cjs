@@ -1,9 +1,9 @@
-const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut, desktopCapturer } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
 let mainWindow, overlayWindow, controlWindow, tray;
-let screenAnalysisTimer = null;
-let screenCaptureBusy = false;
-let overlayDisplayId = null;
+let pointerTimer = null;
+let mouseButtonMonitor = null;
+let overlayBounds = null;
 let overlaySettings = { cursor: 'glow', color: '#78a8ff', size: 30, trail: 65, speed: 1, opacity: 100 };
 const dev = !app.isPackaged;
 
@@ -79,39 +79,89 @@ function createMain() {
   if (dev) mainWindow.loadURL('http://127.0.0.1:5173/desktop.html'); else mainWindow.loadFile(path.join(__dirname, '../dist/desktop.html'));
   mainWindow.on('closed', () => mainWindow = null);
 }
-async function captureOverlayScreen() {
-  if (!overlayWindow || overlayWindow.isDestroyed() || screenCaptureBusy) return;
-  screenCaptureBusy = true;
-  try {
-    const display = screen.getAllDisplays().find(item => item.id === overlayDisplayId) || screen.getPrimaryDisplay();
-    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 480, height: 270 }, fetchWindowIcons: false });
-    const source = sources.find(item => String(item.display_id) === String(display.id)) || sources[0];
-    if (!source || source.thumbnail.isEmpty() || !overlayWindow || overlayWindow.isDestroyed()) return;
-    const size = source.thumbnail.getSize();
-    overlayWindow.webContents.send('screen-frame', { dataUrl: source.thumbnail.toDataURL(), width: size.width, height: size.height, bounds: display.bounds, capturedAt: Date.now() });
-  } catch (error) {
-    console.warn('Screen UI analysis capture failed:', error);
-  } finally {
-    screenCaptureBusy = false;
+function stopMouseButtonMonitor() {
+  if (mouseButtonMonitor) {
+    mouseButtonMonitor.kill();
+    mouseButtonMonitor = null;
   }
+}
+function startMouseButtonMonitor() {
+  if (process.platform !== 'win32' || mouseButtonMonitor) return;
+  const script = `
+    Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class IRMC_MouseState { [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key); }'
+    $left = $false
+    $right = $false
+    while ($true) {
+      $nextLeft = ([IRMC_MouseState]::GetAsyncKeyState(1) -band 0x8000) -ne 0
+      $nextRight = ([IRMC_MouseState]::GetAsyncKeyState(2) -band 0x8000) -ne 0
+      if ($nextLeft -ne $left) { if ($nextLeft) { [Console]::Out.WriteLine('down:left') } else { [Console]::Out.WriteLine('up:left') }; [Console]::Out.Flush(); $left = $nextLeft }
+      if ($nextRight -ne $right) { if ($nextRight) { [Console]::Out.WriteLine('down:right') } else { [Console]::Out.WriteLine('up:right') }; [Console]::Out.Flush(); $right = $nextRight }
+      Start-Sleep -Milliseconds 8
+    }
+  `;
+  const encoded = Buffer.from(script, 'utf16le').toString('base64');
+  const child = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded], { windowsHide: true });
+  let pending = '';
+  child.stdout.setEncoding('utf8');
+  child.stdout.on('data', chunk => {
+    pending += chunk;
+    const lines = pending.split(/\\r?\\n/);
+    pending = lines.pop() || '';
+    for (const line of lines) {
+      const [phase, button] = line.trim().split(':');
+      if (!phase || !button || !overlayWindow || overlayWindow.isDestroyed() || !overlayBounds) continue;
+      const point = screen.getCursorScreenPoint();
+      overlayWindow.webContents.send('cursor-button', { phase, button, ...point, bounds: overlayBounds });
+    }
+  });
+  child.on('error', error => console.warn('Mouse button monitor failed:', error));
+  child.on('close', () => { if (mouseButtonMonitor === child) mouseButtonMonitor = null; });
+  mouseButtonMonitor = child;
 }
 
 function createOverlay(settings = overlaySettings) {
   overlaySettings = settings || overlaySettings;
-  if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.webContents.send('overlay:settings', overlaySettings); if (!controlWindow || controlWindow.isDestroyed()) createOverlayControls(); return; }
+  if (overlayWindow && !overlayWindow.isDestroyed()) {
+    overlayWindow.webContents.send('overlay:settings', overlaySettings);
+    if (!controlWindow || controlWindow.isDestroyed()) createOverlayControls();
+    return;
+  }
   const displays = screen.getAllDisplays();
-  const bounds = displays.find(d => d.bounds.x === 0 && d.bounds.y === 0) || screen.getPrimaryDisplay();
-  overlayDisplayId = bounds.id;
-  overlayWindow = new BrowserWindow({ x: bounds.bounds.x, y: bounds.bounds.y, width: bounds.bounds.width, height: bounds.bounds.height, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, resizable: false, movable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, fullscreen: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
-  overlayWindow.setAlwaysOnTop(true, 'screen-saver'); overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); overlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  const display = displays.find(item => item.bounds.x === 0 && item.bounds.y === 0) || screen.getPrimaryDisplay();
+  overlayBounds = display.bounds;
+  overlayWindow = new BrowserWindow({
+    x: display.bounds.x, y: display.bounds.y,
+    width: display.bounds.width, height: display.bounds.height,
+    frame: false, transparent: true, backgroundColor: '#00000000',
+    hasShadow: false, resizable: false, movable: false, focusable: false,
+    skipTaskbar: true, alwaysOnTop: true, fullscreen: false,
+    webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true }
+  });
+  overlayWindow.setAlwaysOnTop(true, 'screen-saver');
+  overlayWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  overlayWindow.setIgnoreMouseEvents(true, { forward: true });
   overlayWindow.setContentProtection(true);
-  if (dev) overlayWindow.loadURL('http://127.0.0.1:5173/desktop.html#/overlay'); else overlayWindow.loadFile(path.join(__dirname, '../dist/desktop.html'), { hash: '/overlay' });
-  overlayWindow.on('closed', () => { overlayWindow = null; overlayDisplayId = null; if (screenAnalysisTimer) { clearInterval(screenAnalysisTimer); screenAnalysisTimer = null; } if (controlWindow && !controlWindow.isDestroyed()) controlWindow.close(); });
+  if (dev) overlayWindow.loadURL('http://127.0.0.1:5173/desktop.html#/overlay');
+  else overlayWindow.loadFile(path.join(__dirname, '../dist/desktop.html'), { hash: '/overlay' });
+  overlayWindow.on('closed', () => {
+    overlayWindow = null;
+    overlayBounds = null;
+    if (pointerTimer) { clearInterval(pointerTimer); pointerTimer = null; }
+    stopMouseButtonMonitor();
+    if (controlWindow && !controlWindow.isDestroyed()) controlWindow.close();
+  });
   createOverlayControls();
-  const timer = setInterval(() => { if (!overlayWindow || overlayWindow.isDestroyed()) { clearInterval(timer); return; } overlayWindow.webContents.send('cursor-position', { ...screen.getCursorScreenPoint(), bounds: bounds.bounds }); }, 16);
-  if (screenAnalysisTimer) clearInterval(screenAnalysisTimer);
-  screenAnalysisTimer = setInterval(captureOverlayScreen, 650);
-  setTimeout(captureOverlayScreen, 400);
+  let lastX = null;
+  let lastY = null;
+  pointerTimer = setInterval(() => {
+    if (!overlayWindow || overlayWindow.isDestroyed()) return;
+    const point = screen.getCursorScreenPoint();
+    if (point.x === lastX && point.y === lastY) return;
+    lastX = point.x;
+    lastY = point.y;
+    overlayWindow.webContents.send('cursor-position', { ...point, bounds: overlayBounds });
+  }, 16);
+  startMouseButtonMonitor();
 }
 function createOverlayControls() {
   if (controlWindow && !controlWindow.isDestroyed()) return;

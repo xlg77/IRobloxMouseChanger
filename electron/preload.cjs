@@ -11,5 +11,5 @@ contextBridge.exposeInMainWorld('mouseChanger', {
   applySystemCursor: (style) => ipcRenderer.invoke('system-cursor:apply', style),
   restoreSystemCursor: () => ipcRenderer.invoke('system-cursor:restore'),
   onCursorPosition: (callback) => { const fn = (_event, point) => callback(point); ipcRenderer.on('cursor-position', fn); return () => ipcRenderer.removeListener('cursor-position', fn); },
-  onScreenFrame: (callback) => { const fn = (_event, frame) => callback(frame); ipcRenderer.on('screen-frame', fn); return () => ipcRenderer.removeListener('screen-frame', fn); }
+  onCursorButton: (callback) => { const fn = (_event, button) => callback(button); ipcRenderer.on('cursor-button', fn); return () => ipcRenderer.removeListener('cursor-button', fn); }
 });
