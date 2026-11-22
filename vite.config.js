@@ -1,3 +1,4 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
-export default defineConfig({ plugins: [react()], base: './', build: { outDir: 'dist' } });
+import { resolve } from 'node:path';
+export default defineConfig({plugins:[react()],base:'./',build:{outDir:'dist',rollupOptions:{input:{main:resolve(process.cwd(),'index.html'),desktop:resolve(process.cwd(),'desktop.html')}}}});
