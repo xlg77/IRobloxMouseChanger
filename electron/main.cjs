@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, screen, Tray, Menu, nativeImage, globalShortcut } = require('electron');
 const path = require('path');
 let mainWindow, overlayWindow, controlWindow, tray;
+let overlaySettings = { cursor: 'glow', color: '#78a8ff', size: 30, trail: 65, speed: 1, opacity: 100 };
 const dev = !app.isPackaged;
 
 const fs = require('fs');
@@ -75,8 +76,9 @@ function createMain() {
   if (dev) mainWindow.loadURL('http://127.0.0.1:5173/desktop.html'); else mainWindow.loadFile(path.join(__dirname, '../dist/desktop.html'));
   mainWindow.on('closed', () => mainWindow = null);
 }
-function createOverlay() {
-  if (overlayWindow && !overlayWindow.isDestroyed()) { if (!controlWindow || controlWindow.isDestroyed()) createOverlayControls(); return; }
+function createOverlay(settings = overlaySettings) {
+  overlaySettings = settings || overlaySettings;
+  if (overlayWindow && !overlayWindow.isDestroyed()) { overlayWindow.webContents.send('overlay:settings', overlaySettings); if (!controlWindow || controlWindow.isDestroyed()) createOverlayControls(); return; }
   const displays = screen.getAllDisplays();
   const bounds = displays.find(d => d.bounds.x === 0 && d.bounds.y === 0) || screen.getPrimaryDisplay();
   overlayWindow = new BrowserWindow({ x: bounds.bounds.x, y: bounds.bounds.y, width: bounds.bounds.width, height: bounds.bounds.height, frame: false, transparent: true, backgroundColor: '#00000000', hasShadow: false, resizable: false, movable: false, focusable: false, skipTaskbar: true, alwaysOnTop: true, fullscreen: false, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), contextIsolation: true, nodeIntegration: false, sandbox: true } });
@@ -108,7 +110,8 @@ async function stopOverlayAndRestore() {
   if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show();
   return true;
 }
-ipcMain.handle('overlay:start', () => { createOverlay(); if (mainWindow) mainWindow.hide(); return true; });
+ipcMain.handle('overlay:start', (_event, settings) => { overlaySettings = settings || overlaySettings; createOverlay(overlaySettings); if (mainWindow) mainWindow.hide(); return true; });
+ipcMain.handle('overlay:get-settings', () => overlaySettings);
 ipcMain.handle('overlay:stop', async () => stopOverlayAndRestore());
 ipcMain.handle('overlay:restore-and-stop', async () => stopOverlayAndRestore());
 ipcMain.handle('overlay:close-only', () => { if (overlayWindow) overlayWindow.close(); if (controlWindow) controlWindow.close(); if (mainWindow) mainWindow.show(); return true; });

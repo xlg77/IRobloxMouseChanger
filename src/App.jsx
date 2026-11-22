@@ -2,6 +2,14 @@ import React, { useEffect, useState } from 'react';
 import * as Babel from '@babel/standalone';
 import { createPortal } from 'react-dom';
 import { Check, MousePointer2, Gamepad2, SlidersHorizontal, Code2, Play, Square, Eye, Sparkles, Settings2, Monitor, ChevronRight, Palette, RotateCcw, Info, X } from 'lucide-react';
+import GlowCursor from './cursors/GlowCursor.jsx';
+import SwarmCursor from './cursors/SwarmCursor.jsx';
+import GhostCursor from './cursors/GhostCursor.jsx';
+import TargetCursor from './cursors/TargetCursor.jsx';
+import FluidGlass from './cursors/FluidGlass.jsx';
+import TextCursor from './cursors/TextCursor.jsx';
+import SplashCursor from './cursors/SplashCursor.jsx';
+import BlobCursor from './cursors/BlobCursor.jsx';
 
 const CURSORS = [
   { id:'glow', name:'Glow Cursor', desc:'부드러운 빛 번짐 효과', tag:'GLOW', icon:'✦', color:'#78a8ff' },
@@ -37,13 +45,28 @@ function CursorGraphic({ type, x=220, y=180, color='#78a8ff', size=30, trail=65,
 }
 
 function Overlay({settings, onClose, customComponent}) {
-  const [point,setPoint] = useState({x:300,y:240});
-  useEffect(()=>window.mouseChanger?.onCursorPosition(p=>setPoint({x:p.x,y:p.y})),[]);
+  const [liveSettings,setLiveSettings]=useState(settings || {cursor:'glow',color:'#78a8ff',size:30,trail:65,speed:1,opacity:100});
+  useEffect(()=>{
+    let alive=true;
+    window.mouseChanger?.getOverlaySettings?.().then(value=>{if(alive&&value)setLiveSettings(value);}).catch(()=>{});
+    const off=window.mouseChanger?.onOverlaySettings?.(value=>{if(value)setLiveSettings(value);});
+    return ()=>{alive=false;off?.();};
+  },[]);
   useEffect(()=>{const key=e=>{if(e.key==='Escape') onClose();};window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key);},[onClose]);
-  const cursor = CURSORS.find(c=>c.id===settings.cursor) || CURSORS[0];
-  return <div className="overlay-root" aria-hidden="true">
-    {settings.cursor==='custom' && customComponent ? React.createElement(customComponent,{x:point.x,y:point.y,color:settings.color,size:settings.size}) : <div className="overlay-cursor-position" style={{left:point.x,top:point.y}}><CursorGraphic type={cursor.id} x={0} y={0} color={settings.color} size={settings.size} trail={settings.trail} speed={settings.speed} opacity={settings.opacity}/></div>}
-  </div>;
+  const color=liveSettings.color || '#78a8ff';
+  const size=Number(liveSettings.size)||30;
+  const style={width:'100%',height:'100%',opacity:(Number(liveSettings.opacity)||100)/100};
+  const id=liveSettings.cursor || 'glow';
+  let effect;
+  if(id==='swarm') effect=<SwarmCursor color={color} accentColor={color} size={Math.max(1.2,size/12)} speed={liveSettings.speed||1} hideCursor={false} style={style}/>;
+  else if(id==='ghost') effect=<GhostCursor color={color} size={Math.max(24,size*2.6)} trailLength={Math.max(1,liveSettings.trail||50)} hideCursor={false} style={style}/>;
+  else if(id==='target') effect=<TargetCursor cursorColor={color} size={Math.max(18,size*1.2)} hideDefaultCursor={false}/>;
+  else if(id==='fluid') effect=<FluidGlass color={color} size={Math.max(100,size*4)} interaction="follow" style={style}/>;
+  else if(id==='text') effect=<TextCursor text="Aa" color={color} fontSize={Math.max(14,size)} hideCursor={false} style={style}/>;
+  else if(id==='splash') effect=<SplashCursor colors={[color]} rainbow={false} size={Math.max(.35,size/30)} theme="dark" style={style}/>;
+  else if(id==='blob') effect=<BlobCursor color={color} size={Math.max(48,size*4)} hideCursor={false} style={style}/>;
+  else effect=<GlowCursor color={color} trailWidth={Math.max(.5,size/10)} glow={1.2} quality="high" enabled style={style}/>;
+  return <div className="overlay-root" aria-hidden="true"><div className="overlay-effect-stage">{effect}</div></div>;
 }
 
 export default function App(){
@@ -60,7 +83,7 @@ export default function App(){
   const [previewPos,setPreviewPos]=useState({x:220,y:150});
   const selected=CURSORS.find(c=>c.id===settings.cursor)||CURSORS[0];
   const update=(key,value)=>setSettings(s=>({...s,[key]:value}));
-  const start=async()=>{if(window.mouseChanger){await window.mouseChanger.startOverlay();setActive(true);}};
+  const start=async()=>{if(window.mouseChanger){await window.mouseChanger.startOverlay(settings);setActive(true);}};
   const stop=async()=>{if(window.mouseChanger){await window.mouseChanger.stopOverlay();setActive(false);}};
   const applyCode=()=>{
     try {

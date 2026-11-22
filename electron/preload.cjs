@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('mouseChanger', {
-  startOverlay: () => ipcRenderer.invoke('overlay:start'),
+  startOverlay: (settings) => ipcRenderer.invoke('overlay:start', settings),
+  getOverlaySettings: () => ipcRenderer.invoke('overlay:get-settings'),
+  onOverlaySettings: (callback) => { const fn = (_event, value) => callback(value); ipcRenderer.on('overlay:settings', fn); return () => ipcRenderer.removeListener('overlay:settings', fn); },
   stopOverlay: () => ipcRenderer.invoke('overlay:stop'),
   restoreAndStopOverlay: () => ipcRenderer.invoke('overlay:restore-and-stop'),
   closeOverlayOnly: () => ipcRenderer.invoke('overlay:close-only'),
